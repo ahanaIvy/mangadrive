@@ -8,7 +8,8 @@
     "regen": "node src/build.mjs --regen",
     "build:offline": "node src/build.mjs --no-ingest",
     "indexnow": "node src/indexnow.mjs",
-    "serve": "npx --yes serve dist"
+    "serve": "wrangler dev",
+    "deploy": "wrangler deploy"
   },
   "repository": {
     "type": "git",
@@ -33,5 +34,8 @@
   "private": true,
   "engines": {
     "node": ">=20.16"
+  },
+  "devDependencies": {
+    "wrangler": "^4.156.0"
   }
 }

@@ -32,6 +32,8 @@
   if (!reader) return;
   const start = reader.querySelector('[data-reader-start]');
   const url = reader.dataset.pdf;
+  // 別ドメインの PDF は Worker の /pdf プロキシ経由（CORS 対策）
+  const src = new URL(url, location.href).origin === location.origin ? url : `/pdf?u=${encodeURIComponent(url)}`;
   const fallback = () => {
     reader.classList.add('on');
     reader.innerHTML = `<iframe src="${esc(url)}#view=FitH" title="PDFリーダー" loading="lazy"></iframe><p class="small" style="text-align:center"><a href="${esc(url)}" target="_blank" rel="noopener">新しいタブでPDFを開く</a></p>`;
@@ -42,7 +44,7 @@
     try {
       const pdfjs = await import(PDFJS + 'pdf.min.mjs');
       pdfjs.GlobalWorkerOptions.workerSrc = PDFJS + 'pdf.worker.min.mjs';
-      const doc = await pdfjs.getDocument({ url, cMapUrl: PDFJS + 'cmaps/', cMapPacked: true }).promise;
+      const doc = await pdfjs.getDocument({ url: src, cMapUrl: PDFJS + 'cmaps/', cMapPacked: true }).promise;
       reader.classList.add('on');
       reader.innerHTML = `<div class="reader-bar"><span>全${doc.numPages}ページ</span><a href="${esc(url)}" target="_blank" rel="noopener">PDFを開く</a></div>`;
       const width = Math.min(reader.clientWidth || 900, 900) * (window.devicePixelRatio || 1);

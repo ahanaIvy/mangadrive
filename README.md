@@ -2,7 +2,7 @@
 
 A fully automated Japanese manga website. You add PDF URLs and the system does the rest:
 it reads each PDF's metadata, renders the cover and preview images, writes Japanese
-content, builds SEO and AIO pages, deploys, and notifies Bing.
+content, builds SEO and AIO pages, deploys to Cloudflare Workers, and notifies Bing.
 
 ## Kaam kaise karta hai (Roman Urdu)
 
@@ -13,7 +13,7 @@ content, builds SEO and AIO pages, deploys, and notifies Bing.
      - **Image metadata** (cover URL ka EXIF / IPTC / XMP)
    - Cover aur preview pages ki WebP images banengi. Har image mein **hamara apna metadata** (XMP + EXIF: title, author, MangaDrive credit, page URL) embed hoga.
    - Japanese content generate hoga: summary, AI-overview answer, highlights, FAQ, aur Jotaro ka comment.
-   - Website `dist/` mein build hogi, GitHub Pages par deploy hogi, aur IndexNow ke zariye Bing/Yandex ko ping jayega.
+   - Website `dist/` mein build hogi, Cloudflare Workers par deploy hogi, aur IndexNow ke zariye Bing/Yandex ko ping jayega.
 3. Actions tab → "Build & Deploy MangaDrive" → **Run workflow** se aap URLs directly bhi paste kar sakte hain.
 
 ### Optional overrides
@@ -22,17 +22,27 @@ content, builds SEO and AIO pages, deploys, and notifies Bing.
 https://example.com/vol2.pdf | title=桜の剣士 第2巻 | author=山田太郎 | genres=時代劇,アクション | cover=https://example.com/c.jpg
 ```
 
-## Setup (one time)
+## Setup — Cloudflare Workers (one time)
 
-1. **GitHub Pages**: Settings → Pages → Source: **GitHub Actions**. Custom domain: `mangadrive.online`.
-2. **DNS** (at your domain registrar):
-   - `A` records for `@`: `185.199.108.153`, `185.199.109.153`, `185.199.110.153`, `185.199.111.153`
-   - `CNAME` record for `www`: `ahanaivy.github.io`
-3. **Optional secrets/variables** (Settings → Secrets and variables → Actions):
-   - Secret `ANTHROPIC_API_KEY`: enables AI-written content. Claude reads the cover and preview images plus the metadata and writes the Japanese content. Without it, the built-in Japanese templates are used.
-   - Variable `SOURCES_FEED_URL`: a remote TXT/CSV/JSON list of PDF URLs, such as a published Google Sheet CSV. URLs added there are picked up automatically and you never need to commit.
-   - Variable `INDEXNOW_KEY`: your own IndexNow key. The default key is in `site.config.mjs`.
-4. **Google Search Console** and **Bing Webmaster Tools**: add the site and submit `https://mangadrive.online/sitemap.xml`.
+The site runs on a **Cloudflare Worker with Static Assets**. GitHub Actions does the build (PDF rendering can't run inside a Worker) and then deploys to Cloudflare with `wrangler deploy`.
+
+1. **Domain on Cloudflare**: add `mangadrive.online` to your Cloudflare account and set the nameservers Cloudflare gives you at your registrar.
+2. **API token**: Cloudflare dashboard → My Profile → API Tokens → Create Token → template **"Edit Cloudflare Workers"**.
+3. **Account ID**: Cloudflare dashboard → Workers & Pages → right sidebar → "Account ID".
+4. In GitHub, go to Settings → Secrets and variables → Actions → **New repository secret** and add:
+   - `CLOUDFLARE_API_TOKEN`
+   - `CLOUDFLARE_ACCOUNT_ID`
+   - (optional) `ANTHROPIC_API_KEY`: AI-written content. Claude reads the cover and preview images plus the metadata and writes the Japanese content.
+5. Optional **variables**: `SOURCES_FEED_URL` (remote TXT/CSV/JSON list of PDF URLs, e.g. a published Google Sheet CSV) and `INDEXNOW_KEY`.
+6. Go to Actions → "Build & Deploy MangaDrive" → **Run workflow**. The Worker is created and `mangadrive.online` is attached automatically as a Custom Domain (see `wrangler.jsonc`).
+7. (Optional) Redirect `www`: Cloudflare → Rules → Redirect Rules → `www.mangadrive.online/*` → `https://mangadrive.online/${1}` (301).
+8. Submit `https://mangadrive.online/sitemap.xml` to **Google Search Console** and **Bing Webmaster Tools**.
+
+### What the Worker does
+- Serves the static site from `dist/`, with cache headers from `public/_headers`.
+- `/pdf?u=<pdf-url>` is a PDF proxy so the reader can open PDFs from servers without CORS. It only serves PDFs listed in the site's own catalog, so it is not an open proxy.
+
+Local preview: `npm run build && npx wrangler dev`
 
 ## SEO / AIO features
 
@@ -68,7 +78,7 @@ npm install
 npm run build        # ingest new PDFs and build the site
 npm run refresh      # re-download every PDF
 npm run regen        # regenerate all content (e.g. after adding an API key)
-npm run serve        # preview dist/ locally
+npx wrangler dev     # preview the Worker + site locally
 ```
 
 Settings (name, emails, Jotaro bio, AI model, etc.) are in `site.config.mjs`.

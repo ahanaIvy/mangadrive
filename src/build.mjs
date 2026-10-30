@@ -273,6 +273,7 @@ ${urls
 User-agent: *
 Allow: /
 Disallow: /search/
+Disallow: /pdf
 
 # AI 検索・回答エンジンを歓迎します
 User-agent: Googlebot
@@ -381,8 +382,6 @@ ${all
     JSON.stringify({ name: config.orgName, short_name: config.orgName, lang: 'ja', start_url: '/', display: 'standalone', background_color: '#0f0e13', theme_color: '#e63946', icons: [{ src: '/assets/logo.png', sizes: '512x512', type: 'image/png' }] }),
   );
   await out(`${config.indexNowKey}.txt`, config.indexNowKey);
-  await out('CNAME', config.domain);
-  await out('.nojekyll', '');
 }
 
 const all = await ingestAll();
