@@ -227,6 +227,8 @@ export function mangaPage(r, { related, picks }) {
     ...(m.rights ? { copyrightNotice: m.rights } : {}),
     ...(r.series ? { isPartOf: { '@type': 'BookSeries', name: r.series } } : {}),
     ...(r.volume ? { volumeNumber: String(r.volume) } : {}),
+    ...(r.overrides?.sourcePage ? { isBasedOn: r.overrides.sourcePage } : {}),
+    ...(r.overrides?.license ? { license: r.overrides.license } : {}),
     encoding: {
       '@type': 'MediaObject',
       contentUrl: r.url,
@@ -297,6 +299,8 @@ export function mangaPage(r, { related, picks }) {
     ['画像の作者（EXIF/XMP）', r.imageMeta?.author],
     ['画像の著作権（EXIF/IPTC）', r.imageMeta?.copyright],
     ['画像の説明', r.imageMeta?.description],
+    ['出典', r.overrides?.sourcePage && `<a href="${esc(r.overrides.sourcePage)}" rel="noopener" target="_blank">${esc(r.overrides.sourceSite || new URL(r.overrides.sourcePage).hostname)}</a>`],
+    ['ライセンス', r.overrides?.license],
     ['掲載日', jaDate(r.addedAt)],
     ['最終更新', jaDate(r.updatedAt)],
   ].filter(([, v]) => v);
@@ -344,7 +348,7 @@ export function mangaPage(r, { related, picks }) {
 
   <section aria-labelledby="md-h">
     <h2 id="md-h">作品情報・PDFメタデータ</h2>
-    <table class="meta-table"><tbody>${metaRows.map(([k, v]) => `<tr><th scope="row">${esc(k)}</th><td>${String(v).startsWith('<code>') ? v : esc(v)}</td></tr>`).join('')}</tbody></table>
+    <table class="meta-table"><tbody>${metaRows.map(([k, v]) => `<tr><th scope="row">${esc(k)}</th><td>${/^<(code|a) /.test(String(v)) || String(v).startsWith('<code>') ? v : esc(v)}</td></tr>`).join('')}</tbody></table>
     ${m.outline.length ? `<h3>目次（PDFしおり）</h3><ol class="toc">${m.outline.map((o) => `<li>${esc(o)}</li>`).join('')}</ol>` : ''}
   </section>
 

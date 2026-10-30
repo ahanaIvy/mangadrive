@@ -1,0 +1,24 @@
+{
+  "_help": "巡回するサイトを sites に追加します。robots.txt で許可されたページだけを巡回し、allow のドメイン外には出ません。権利者の許可がある、またはパブリックドメイン／CCライセンスのサイトのみ登録してください。",
+  "defaults": {
+    "maxPages": 200,
+    "maxDepth": 3,
+    "delayMs": 1500,
+    "maxNewPerRun": 50
+  },
+  "sites": [
+    {
+      "name": "サイト名（例）",
+      "enabled": false,
+      "start": ["https://example.com/manga/", "https://example.com/sitemap.xml"],
+      "allow": ["example.com"],
+      "follow": "/manga/",
+      "pdfPattern": "\\.pdf($|[?#])",
+      "maxPages": 300,
+      "maxDepth": 3,
+      "genres": ["少年漫画"],
+      "license": "CC BY 4.0",
+      "author": ""
+    }
+  ]
+}

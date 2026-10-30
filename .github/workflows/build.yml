@@ -47,6 +47,9 @@ jobs:
             grep -qxF "$u" data/sources.txt || echo "$u" >> data/sources.txt
           done
 
+      - name: 自動クロール（data/crawl.json のサイトから新しい PDF を発見）
+        run: node src/crawl.mjs
+
       - name: 取り込み（PDF解析・画像生成・コンテンツ生成）
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}

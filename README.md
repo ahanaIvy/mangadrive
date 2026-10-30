@@ -54,6 +54,22 @@ Local preview: `npm run build && npx wrangler dev`
 | IndexNow ping after every deploy (Bing) | `src/indexnow.mjs` |
 | Visible metadata table (all PDF and image metadata) | manga pages |
 
+## Auto crawler (no daily work needed)
+
+`src/crawl.mjs` runs every 6 hours, before ingest:
+1. Visits every site in `data/crawl.json` (start pages, sitemap.xml, or RSS).
+2. Follows links only inside the `allow` domains, up to `maxDepth` / `maxPages`.
+3. Obeys each site's **robots.txt** and Crawl-delay, and identifies itself as `MangaDriveBot`.
+4. For every PDF link it saves the page's **title** (og:title / `<title>` / link text), **description** (og:description / meta description), **featured image** (og:image or the thumbnail beside the link), author, and keywords. The source page is credited on the manga page (出典) and in JSON-LD `isBasedOn`.
+5. New PDFs go into `data/crawled.json` (max `maxNewPerRun` per run), and then the normal pipeline makes the full SEO page.
+
+Add a site:
+```json
+{ "name": "Site name", "start": ["https://site.example/manga/"], "allow": ["site.example"],
+  "follow": "/manga/", "genres": ["少年漫画"], "license": "CC BY 4.0" }
+```
+Only add sites whose content you have the right to republish: your own, creators who agreed, or public-domain / Creative Commons sources.
+
 ## Jotaro
 
 Jotaro is MangaDrive's chief manga curator. A "Jotaro's picks" list appears under the **related works** on every post.

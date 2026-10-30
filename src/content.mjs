@@ -34,6 +34,7 @@ function facts(rec) {
     画像メタデータ: rec.imageMeta ? JSON.stringify(rec.imageMeta) : '',
     抽出テキスト冒頭: clip(rec.textExcerpt, 1500),
     運営側メモ: rec.overrides?.description || '',
+    出典ページ: rec.overrides?.sourcePage || '',
   };
 }
 
@@ -47,7 +48,8 @@ export function templateContent(rec) {
   const created = m.created ? jaDate(m.created) : null;
   const answer = `『${t}』は、${by}全${m.pages}ページの${g}作品です。MangaDrive ではPDF形式（${formatBytes(rec.file.bytes)}）で公開されている本作を、作品情報・メタデータ・プレビュー画像とともに紹介しています。${sub ? clip(sub, 60) : ''}`;
   return {
-    metaTitle: clip(`${t}${rec.author ? `（${rec.author}）` : ''} PDF・あらすじ・作品情報`, 40),
+    metaTitle:
+      [`${t}${rec.author ? `（${rec.author}）` : ''} PDF・あらすじ・作品情報`, `${t} PDF・あらすじ・作品情報`, `${t}のあらすじ・作品情報`, `${t} PDF`].find((x) => x.length <= 36) || clip(t, 36),
     metaDescription: clip(`『${t}』${rec.author ? `（${rec.author}）` : ''}は全${m.pages}ページの${g}漫画。${sub ? clip(sub, 50) + '。' : ''}あらすじ、見どころ、PDF情報、よくある質問をMangaDriveがまとめて紹介します。`, 120),
     answer,
     summary: [

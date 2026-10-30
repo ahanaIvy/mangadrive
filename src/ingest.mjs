@@ -314,6 +314,7 @@ export async function loadSources() {
   const txt = await fs.readFile(path.join(ROOT, 'data', 'sources.txt'), 'utf8').catch(() => '');
   list.push(...parseSourceText(txt));
   list.push(...(await readJson(path.join(ROOT, 'data', 'sources.json'), [])).map((s) => (typeof s === 'string' ? { url: s } : s)));
+  list.push(...(await readJson(path.join(ROOT, 'data', 'crawled.json'), []))); // src/crawl.mjs が自動追加
   for (const feed of String(process.env.SOURCES_FEED_URL || '').split(/\s+/).filter(Boolean)) {
     try {
       const { buf } = await fetchBuffer(feed, 5 * 1024 * 1024);
