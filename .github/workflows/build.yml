@@ -1,4 +1,4 @@
-name: Build & Deploy MangaDrive
+name: Ingest PDFs (MangaDrive)
 
 on:
   push:
@@ -47,7 +47,7 @@ jobs:
             grep -qxF "$u" data/sources.txt || echo "$u" >> data/sources.txt
           done
 
-      - name: 取り込み & ビルド
+      - name: 取り込み（PDF解析・画像生成・コンテンツ生成）
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           SOURCES_FEED_URL: ${{ vars.SOURCES_FEED_URL }}
@@ -61,17 +61,13 @@ jobs:
           git add data
           git diff --cached --quiet || (git commit -m "chore: 自動取り込み $(date -u +%F)" && git push) || true
 
-      - name: Cloudflare Workers にデプロイ
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: deploy
+      # デプロイは Cloudflare Workers Builds（Git 連携）が上の push を受けて自動で行う
 
       - name: IndexNow（Bing など）へ更新通知
         env:
           INDEXNOW_KEY: ${{ vars.INDEXNOW_KEY }}
         run: |
+          sleep 240 # Cloudflare のデプロイ完了を待つ
           node src/indexnow.mjs || true
           git add data/indexnow-sent.json 2>/dev/null || true
           git diff --cached --quiet || (git commit -m "chore: IndexNow 送信記録" && git push) || true

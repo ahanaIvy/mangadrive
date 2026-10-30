@@ -10,6 +10,8 @@ import { layout, listPage, mangaPage, grid, jotaroBlock, jotaroNode, jotaroItemL
 import { aboutPage, contactPage, termsPage, privacyPage, dmcaPage, editorialPage, jotaroPage } from './pages.mjs';
 
 const args = new Set(process.argv.slice(2));
+// Cloudflare Workers Builds（WORKERS_CI=1）では取り込みをせず、GitHub Actions がコミットしたキャッシュだけで出力する
+const noIngest = args.has('--no-ingest') || (process.env.WORKERS_CI && !process.env.INGEST);
 const S = config.siteUrl;
 const out = (p, c) => writeFile(path.join(DIST, p), c);
 
@@ -17,7 +19,7 @@ const out = (p, c) => writeFile(path.join(DIST, p), c);
 async function ingestAll() {
   const sources = await loadSources();
   const blocked = await loadBlocklist();
-  console.log(`ソース: ${sources.length}件`);
+  console.log(`ソース: ${sources.length}件${noIngest ? '（キャッシュのみ使用）' : ''}`);
   const records = [];
   const queue = [...sources];
   const failed = [];
@@ -26,7 +28,10 @@ async function ingestAll() {
       const src = queue.shift();
       let rec = await readJson(cacheFile(src.url), null);
       try {
-        if (!rec && args.has('--no-ingest')) continue;
+        if (noIngest) {
+          if (rec?.content && rec?.images) records.push(rec);
+          continue;
+        }
         if (!rec || args.has('--refresh') || JSON.stringify(rec.overrides) !== JSON.stringify(src)) {
           const prev = rec;
           rec = await ingestOne(src);

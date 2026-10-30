@@ -24,25 +24,23 @@ https://example.com/vol2.pdf | title=桜の剣士 第2巻 | author=山田太郎 
 
 ## Setup — Cloudflare Workers (one time)
 
-The site runs on a **Cloudflare Worker with Static Assets**. GitHub Actions does the build (PDF rendering can't run inside a Worker) and then deploys to Cloudflare with `wrangler deploy`.
+Two parts work together:
+- **GitHub Actions** (`.github/workflows/build.yml`) does the heavy work: on push and every 6 hours it downloads the PDFs, extracts metadata, renders images, writes content, and commits the results to `data/`.
+- **Cloudflare Workers Builds** (Git integration) deploys on every push to `main`. In Cloudflare (`WORKERS_CI=1`) the build only uses the committed `data/` cache and never re-downloads PDFs.
 
-1. **Domain on Cloudflare**: add `mangadrive.online` to your Cloudflare account and set the nameservers Cloudflare gives you at your registrar.
-2. **API token**: Cloudflare dashboard → My Profile → API Tokens → Create Token → template **"Edit Cloudflare Workers"**.
-3. **Account ID**: Cloudflare dashboard → Workers & Pages → right sidebar → "Account ID".
-4. In GitHub, go to Settings → Secrets and variables → Actions → **New repository secret** and add:
-   - `CLOUDFLARE_API_TOKEN`
-   - `CLOUDFLARE_ACCOUNT_ID`
-   - (optional) `ANTHROPIC_API_KEY`: AI-written content. Claude reads the cover and preview images plus the metadata and writes the Japanese content.
-5. Optional **variables**: `SOURCES_FEED_URL` (remote TXT/CSV/JSON list of PDF URLs, e.g. a published Google Sheet CSV) and `INDEXNOW_KEY`.
-6. Go to Actions → "Build & Deploy MangaDrive" → **Run workflow**. The Worker is created and `mangadrive.online` is attached automatically as a Custom Domain (see `wrangler.jsonc`).
-7. (Optional) Redirect `www`: Cloudflare → Rules → Redirect Rules → `www.mangadrive.online/*` → `https://mangadrive.online/${1}` (301).
-8. Submit `https://mangadrive.online/sitemap.xml` to **Google Search Console** and **Bing Webmaster Tools**.
+Steps:
+1. Cloudflare → Workers & Pages → connect this repo. Build command: `npm run build`. Deploy command: `npx wrangler deploy`.
+2. **Custom domain**: add `mangadrive.online` to the same Cloudflare account (Add a domain) and switch your registrar's nameservers to the ones Cloudflare gives you. Wait until the zone shows **Active**. Then go to Workers & Pages → mangadrive → Settings → **Domains & Routes** → Add → Custom domain → `mangadrive.online`. Do the same for `www.mangadrive.online` if you want it.
+3. GitHub → Settings → Secrets and variables → Actions:
+   - (optional) secret `ANTHROPIC_API_KEY`: AI-written content. Claude reads the cover and preview images plus the metadata and writes the Japanese content.
+   - (optional) variables `SOURCES_FEED_URL` (remote TXT/CSV/JSON list of PDF URLs) and `INDEXNOW_KEY`.
+4. Submit `https://mangadrive.online/sitemap.xml` to **Google Search Console** and **Bing Webmaster Tools**.
+
+Local preview: `npm run build && npx wrangler dev`
 
 ### What the Worker does
 - Serves the static site from `dist/`, with cache headers from `public/_headers`.
 - `/pdf?u=<pdf-url>` is a PDF proxy so the reader can open PDFs from servers without CORS. It only serves PDFs listed in the site's own catalog, so it is not an open proxy.
-
-Local preview: `npm run build && npx wrangler dev`
 
 ## SEO / AIO features
 
