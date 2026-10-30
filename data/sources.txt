@@ -1,0 +1,6 @@
+# MangaDrive ソース一覧 — 1行に1つ PDF の URL を書くだけで自動取り込みされます。
+# 任意で「|」区切りの上書き項目を追加できます（title / author / cover / genres / description / series / volume / slug）
+#
+# 例:
+# https://example.com/manga/vol1.pdf
+# https://example.com/manga/vol2.pdf | title=桜の剣士 第2巻 | author=山田太郎 | genres=時代劇,アクション | cover=https://example.com/cover2.jpg

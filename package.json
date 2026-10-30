@@ -1,0 +1,37 @@
+{
+  "name": "mangadrive",
+  "version": "1.0.0",
+  "description": "MangaDrive (mangadrive.online) — PDF URL から自動生成される日本語漫画サイト",
+  "scripts": {
+    "build": "node src/build.mjs",
+    "refresh": "node src/build.mjs --refresh",
+    "regen": "node src/build.mjs --regen",
+    "build:offline": "node src/build.mjs --no-ingest",
+    "indexnow": "node src/indexnow.mjs",
+    "serve": "npx --yes serve dist"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ahanaIvy/mangadrive.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/ahanaIvy/mangadrive/issues"
+  },
+  "homepage": "https://github.com/ahanaIvy/mangadrive#readme",
+  "dependencies": {
+    "@anthropic-ai/sdk": "^1.3.0",
+    "@napi-rs/canvas": "^1.1.0",
+    "exifr": "^7.1.3",
+    "pdfjs-dist": "^6.4.299",
+    "sharp": "^0.35.5",
+    "zod": "^4.6.7"
+  },
+  "type": "module",
+  "private": true,
+  "engines": {
+    "node": ">=20.16"
+  }
+}

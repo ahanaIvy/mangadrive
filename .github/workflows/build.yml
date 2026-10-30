@@ -1,0 +1,82 @@
+name: Build & Deploy MangaDrive
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: '17 */6 * * *' # 6時間ごとに自動取り込み・再ビルド
+  workflow_dispatch:
+    inputs:
+      pdf_urls:
+        description: '追加する PDF URL（スペース or 改行区切り）'
+        required: false
+      regen:
+        description: 'すべてのコンテンツを再生成する'
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: mangadrive-build
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: 日本語フォント（PDFの表紙レンダリング用）
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq fonts-noto-cjk
+
+      - run: npm ci
+
+      - name: 手動入力の PDF URL を sources.txt に追加
+        if: ${{ github.event.inputs.pdf_urls != '' }}
+        env:
+          URLS: ${{ github.event.inputs.pdf_urls }}
+        run: |
+          for u in $URLS; do
+            grep -qxF "$u" data/sources.txt || echo "$u" >> data/sources.txt
+          done
+
+      - name: 取り込み & ビルド
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          SOURCES_FEED_URL: ${{ vars.SOURCES_FEED_URL }}
+          INDEXNOW_KEY: ${{ vars.INDEXNOW_KEY }}
+        run: node src/build.mjs ${{ github.event.inputs.regen == 'true' && '--regen' || '' }}
+
+      - name: 取り込み結果をコミット
+        run: |
+          git config user.name "mangadrive-bot"
+          git config user.email "bot@mangadrive.online"
+          git add data
+          git diff --cached --quiet || (git commit -m "chore: 自動取り込み $(date -u +%F)" && git push) || true
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+      - id: deploy
+        uses: actions/deploy-pages@v4
+
+      - name: IndexNow（Bing など）へ更新通知
+        env:
+          INDEXNOW_KEY: ${{ vars.INDEXNOW_KEY }}
+        run: |
+          node src/indexnow.mjs || true
+          git add data/indexnow-sent.json 2>/dev/null || true
+          git diff --cached --quiet || (git commit -m "chore: IndexNow 送信記録" && git push) || true
