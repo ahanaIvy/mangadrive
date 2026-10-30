@@ -3,6 +3,30 @@
   const PDFJS = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/';
   const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 
+  // ---------- 曜日タブ ----------
+  document.querySelectorAll('.day-tabs button').forEach((b) =>
+    b.addEventListener('click', () => {
+      const box = b.closest('.weekly');
+      box.querySelectorAll('.day-tabs button').forEach((x) => x.setAttribute('aria-selected', x === b));
+      box.querySelectorAll('.day-panel').forEach((p) => (p.hidden = p.dataset.day !== b.dataset.day));
+    }),
+  );
+
+  // ---------- ヒーロースライダー ----------
+  const slides = document.querySelector('.slides');
+  if (slides) {
+    const dots = [...document.querySelectorAll('.dots span')];
+    const n = dots.length;
+    const cur = () => Math.round(slides.scrollLeft / slides.clientWidth);
+    const go = (i) => slides.scrollTo({ left: ((i + n) % n) * slides.clientWidth, behavior: 'smooth' });
+    const mark = () => dots.forEach((d, i) => d.classList.toggle('on', i === cur()));
+    mark();
+    slides.addEventListener('scroll', () => requestAnimationFrame(mark), { passive: true });
+    dots.forEach((d, i) => d.addEventListener('click', () => go(i)));
+    let timer = n > 1 && !matchMedia('(prefers-reduced-motion: reduce)').matches && setInterval(() => go(cur() + 1), 6000);
+    slides.addEventListener('pointerdown', () => clearInterval(timer), { once: true });
+  }
+
   // ---------- 検索 ----------
   const results = document.getElementById('results');
   if (results) {

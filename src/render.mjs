@@ -65,6 +65,16 @@ const crumbsHtml = (items) =>
     .map(([n, u], i) => (i === items.length - 1 ? `<li aria-current="page">${esc(n)}</li>` : `<li><a href="${esc(u.replace(S, '') || '/')}">${esc(n)}</a></li>`))
     .join('')}</ol></nav>`;
 
+const ICON = {
+  search: '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="currentColor" d="M10 2a8 8 0 0 1 6.32 12.9l5.39 5.4-1.41 1.4-5.4-5.39A8 8 0 1 1 10 2m0 2a6 6 0 1 0 0 12 6 6 0 0 0 0-12"/></svg>',
+  home: '<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="currentColor" d="M12 3 2 11h3v9h5v-6h4v6h5v-9h3z"/></svg>',
+  list: '<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="currentColor" d="M4 4h7v7H4zm9 0h7v7h-7zM4 13h7v7H4zm9 0h7v7h-7z"/></svg>',
+  rank: '<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="currentColor" d="M3 21v-8h5v8zm6.5 0V3h5v18zM16 21v-12h5v12z"/></svg>',
+  user: '<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="currentColor" d="M12 12a5 5 0 1 0 0-10 5 5 0 0 0 0 10m0 2c-5 0-9 2.5-9 6v2h18v-2c0-3.5-4-6-9-6"/></svg>',
+};
+const navItems = [['/', 'ホーム'], ['/manga/', '作品一覧'], ['/ranking/', 'ランキング'], ['/genre/', 'ジャンル'], ['/jotaro/', 'Jotaro']];
+const tabItems = [['/', 'ホーム', 'home'], ['/manga/', '作品', 'list'], ['/ranking/', 'ランキング', 'rank'], ['/search/', '検索', 'search'], ['/jotaro/', 'Jotaro', 'user']];
+
 // ---------- レイアウト ----------
 export function layout({ title, description, path, body, jsonld = [], image, type = 'website', crumbs, extraHead = '', noindex = false, published, modified, keywords = [] }) {
   const url = `${S}${path}`;
@@ -109,8 +119,8 @@ ${extraHead}<script type="application/ld+json">${JSON.stringify(graph).replace(/
 <header class="site-header">
   <div class="wrap header-in">
     <a class="logo" href="/" aria-label="${esc(config.orgName)} トップ"><span class="logo-mark">M</span><span>${esc(config.orgName)}</span></a>
-    <form class="search-form" action="/search/" role="search"><input type="search" name="q" placeholder="作品名・作者・ジャンルで検索" aria-label="サイト内検索"><button type="submit">検索</button></form>
-    <nav class="main-nav" aria-label="メインメニュー"><a href="/manga/">作品一覧</a><a href="/genre/">ジャンル</a><a href="/jotaro/">Jotaroのリスト</a><a href="/about/">運営者情報</a></nav>
+    <nav class="main-nav" aria-label="メインメニュー">${navItems.map(([h, t]) => `<a href="${h}"${path === h ? ' aria-current="page"' : ''}>${t}</a>`).join('')}</nav>
+    <form class="search-form" action="/search/" role="search"><input type="search" name="q" placeholder="作品・作者・ジャンル" aria-label="サイト内検索"><button type="submit" aria-label="検索">${ICON.search}</button></form>
   </div>
 </header>
 <main id="main" class="wrap">
@@ -129,21 +139,53 @@ ${body}
   </div>
   <p class="wrap copy">© ${new Date().getFullYear()} ${esc(config.orgName)} (${esc(config.domain)}). All rights reserved.</p>
 </footer>
+<nav class="tabbar" aria-label="モバイルメニュー">${tabItems.map(([h, t, i]) => `<a href="${h}"${path === h ? ' aria-current="page"' : ''}>${ICON[i]}<span>${t}</span></a>`).join('')}</nav>
 <script src="/assets/app.js" defer></script>
 </body>
 </html>`;
 }
 
 // ---------- カード ----------
-export const card = (r, { lazy = true } = {}) => `<article class="card">
+const isNew = (r) => Date.now() - new Date(r.addedAt).getTime() < 7 * 864e5;
+const coverImg = (r, lazy, cls = '') =>
+  `<img${cls ? ` class="${cls}"` : ''} src="/${r.images.cover.path}" width="${r.images.cover.width}" height="${r.images.cover.height}" alt="${esc(r.title)} 表紙" ${lazy ? 'loading="lazy" decoding="async"' : 'fetchpriority="high"'}>`;
+
+export const card = (r, { lazy = true, rank } = {}) => `<article class="card">
   <a href="/manga/${r.slug}/">
-    <img src="/${r.images.cover.path}" width="${r.images.cover.width}" height="${r.images.cover.height}" alt="${esc(r.title)} 表紙" ${lazy ? 'loading="lazy" decoding="async"' : 'fetchpriority="high"'}>
+    <span class="thumb">${coverImg(r, lazy)}${isNew(r) ? '<span class="badge">NEW</span>' : ''}<span class="pages">${r.pdfMeta.pages}P</span>${rank ? `<span class="rank-no">${rank}</span>` : ''}</span>
     <h3>${esc(r.title)}</h3>
   </a>
-  <p class="meta">${r.author ? `<a href="${authorUrl(r.author).replace(S, '')}">${esc(r.author)}</a> · ` : ''}${r.pdfMeta.pages}ページ</p>
+  <p class="meta">${r.author ? esc(r.author) : esc(r.content?.genres?.[0] || '漫画')}</p>
 </article>`;
 
-export const grid = (list, opts) => `<div class="grid">${list.map((r, i) => card(r, { lazy: i > 3, ...opts })).join('')}</div>`;
+export const grid = (list, opts) => `<div class="grid">${list.map((r, i) => card(r, { lazy: i > 5, ...opts })).join('')}</div>`;
+
+// 横スクロールの棚
+export const row = (title, list, more) =>
+  list.length
+    ? `<section class="shelf"><div class="shelf-head"><h2>${esc(title)}</h2>${more ? `<a href="${more}">もっと見る ›</a>` : ''}</div><div class="row">${list.map((r) => card(r)).join('')}</div></section>`
+    : '';
+
+// トップのヒーローバナー（CSS スクロールスナップのカルーセル）
+export const hero = (list) =>
+  list.length
+    ? `<section class="hero-slider" aria-label="注目作品"><div class="slides">${list
+        .map(
+          (r, i) => `<a class="slide" href="/manga/${r.slug}/" style="--art:url('/${r.images.cover.path}')">
+  ${coverImg(r, i > 0, 'slide-cover')}
+  <span class="slide-text"><span class="eyebrow">${i === 0 ? '今週の注目' : esc(r.content.genres[0] || 'おすすめ')}</span><strong>${esc(r.title)}</strong><span class="slide-desc">${esc(clip(r.content.answer, 90))}</span><span class="btn">読む</span></span>
+</a>`,
+        )
+        .join('')}</div><div class="dots">${list.map((_, i) => `<span data-i="${i}"></span>`).join('')}</div></section>`
+    : '';
+
+// ランキング（大きな順位番号つき）
+export const ranking = (list) =>
+  `<ol class="ranking">${list
+    .map(
+      (r, i) => `<li><a href="/manga/${r.slug}/"><span class="no">${i + 1}</span>${coverImg(r, i > 3)}<span class="info"><strong>${esc(r.title)}</strong><small>${esc(r.author || r.content.genres[0] || '')}</small><small class="muted">${r.pdfMeta.pages}ページ · ${esc(r.content.genres.slice(0, 2).join(' / '))}</small></span></a></li>`,
+    )
+    .join('')}</ol>`;
 
 // ---------- Jotaro のおすすめ ----------
 export function jotaroBlock(picks, { heading = `${config.curator.name}のおすすめリスト`, url } = {}) {
@@ -306,6 +348,7 @@ export function mangaPage(r, { related, picks }) {
   ].filter(([, v]) => v);
 
   const body = `<article class="manga">
+  <div class="backdrop" style="--art:url('/${r.images.cover.path}')" aria-hidden="true"></div>
   <header class="manga-head">
     <figure class="cover"><img src="/${r.images.cover.path}" width="${r.images.cover.width}" height="${r.images.cover.height}" alt="${esc(r.title)} 表紙" fetchpriority="high"></figure>
     <div>

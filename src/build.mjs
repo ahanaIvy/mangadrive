@@ -6,7 +6,7 @@ import config from '../site.config.mjs';
 import { ROOT, CACHE, MEDIA, DIST, sha, esc, clip, readJson, writeFile, jaDate, formatBytes, tagSlug, uniq } from './util.mjs';
 import { loadSources, loadBlocklist, ingestOne, saveRecord, cacheFile } from './ingest.mjs';
 import { generateContent } from './content.mjs';
-import { layout, listPage, mangaPage, grid, jotaroBlock, jotaroNode, jotaroItemList, mangaUrl, genreUrl, authorUrl, SITE_ID } from './render.mjs';
+import { layout, listPage, mangaPage, grid, card, row, hero, ranking, jotaroBlock, jotaroNode, jotaroItemList, mangaUrl, genreUrl, authorUrl, SITE_ID } from './render.mjs';
 import { aboutPage, contactPage, termsPage, privacyPage, dmcaPage, editorialPage, jotaroPage } from './pages.mjs';
 
 const args = new Set(process.argv.slice(2));
@@ -87,10 +87,19 @@ function externalPicks(list) {
   return list.map((p) => ({ title: p.title, author: p.author, note: p.note, image: p.image, href: p.url, external: !p.url.startsWith(S) && !p.url.startsWith('/') }));
 }
 
-function internalPicks(all) {
-  // Jotaro が自動で選ぶ：AI生成コンテンツ優先 → ページ数 → 新着
-  return [...all]
-    .sort((a, b) => (b.content.generatedBy === 'ai') - (a.content.generatedBy === 'ai') || b.pdfMeta.pages - a.pdfMeta.pages || b.addedAt.localeCompare(a.addedAt))
+// Jotaro ランキング：AI生成コンテンツ優先 → ページ数 → 新着（data/ranking.json で手動順位も可）
+function rankOrder(all, manual = []) {
+  const pos = (r) => {
+    const i = manual.indexOf(r.slug);
+    return i < 0 ? 1e9 : i;
+  };
+  return [...all].sort(
+    (a, b) => pos(a) - pos(b) || (b.content.generatedBy === 'ai') - (a.content.generatedBy === 'ai') || b.pdfMeta.pages - a.pdfMeta.pages || b.addedAt.localeCompare(a.addedAt),
+  );
+}
+
+function internalPicks(ranked) {
+  return ranked
     .slice(0, 12)
     .map((r) => ({ title: r.title, author: r.author, note: r.content.jotaroComment, image: `/${r.images.cover.path}`, href: `/manga/${r.slug}/` }));
 }
@@ -102,6 +111,20 @@ function picksFor(r, ext, int) {
     .sort((a, b) => a[0] - b[0])
     .slice(0, config.jotaroPicksPerPost)
     .map((a) => a[1]);
+}
+
+// ---------- 曜日別の更新（掲載日の曜日で分類、今日のタブを初期表示） ----------
+function weekdayTabs(all) {
+  if (!all.length) return '';
+  const days = ['日', '月', '火', '水', '木', '金', '土'];
+  const jstDay = (d) => new Date(new Date(d).getTime() + 9 * 3600e3).getUTCDay();
+  const today = jstDay(Date.now());
+  const by = days.map((_, i) => all.filter((r) => jstDay(r.addedAt) === i).slice(0, 12));
+  const order = [1, 2, 3, 4, 5, 6, 0];
+  return `<section class="shelf weekly"><div class="shelf-head"><h2>曜日別の更新</h2></div>
+<div class="day-tabs" role="tablist">${order.map((i) => `<button type="button" role="tab" data-day="${i}" aria-selected="${i === today}">${days[i]}${i === today ? '<small>今日</small>' : ''}</button>`).join('')}</div>
+${order.map((i) => `<div class="day-panel row" data-day="${i}"${i === today ? '' : ' hidden'}>${by[i].length ? by[i].map((r) => card(r)).join('') : '<p class="muted">この曜日の更新はありません。</p>'}</div>`).join('')}
+</section>`;
 }
 
 // ---------- Markdown 版（AI クローラー向け） ----------
@@ -141,7 +164,8 @@ async function buildSite(all) {
   for (const r of all) await fs.cp(path.join(MEDIA, r.slug), path.join(DIST, 'media', r.slug), { recursive: true }).catch(() => {});
 
   const ext = externalPicks(await readJson(path.join(ROOT, 'data', 'jotaro.json'), []));
-  const int = internalPicks(all);
+  const ranked = rankOrder(all, await readJson(path.join(ROOT, 'data', 'ranking.json'), []));
+  const int = internalPicks(ranked);
   const urls = []; // sitemap 用 [path, lastmod, images[]]
 
   // 作品ページ
@@ -219,14 +243,36 @@ async function buildSite(all) {
         jotaroNode(),
         ...(int.length ? [jotaroItemList(int.slice(0, 6), `${S}/`)] : []),
       ],
-      body: `<section class="hero"><h1>${esc(config.orgName)} — ${esc(config.tagline)}</h1><p class="answer">${esc(config.description)}</p><p class="muted">掲載作品 ${all.length}作品 · ${genres.length}ジャンル · 毎日自動更新</p></section>
-<section><h2>新着の漫画</h2>${all.length ? grid(all.slice(0, 12)) : '<p class="muted">作品は準備中です。</p>'}<p><a class="btn ghost" href="/manga/">すべての作品を見る</a></p></section>
-${genres.length ? `<section><h2>ジャンルから探す</h2><p class="tags big">${genres.slice(0, 30).map(([g, i]) => `<a class="tag" href="/genre/${encodeURIComponent(tagSlug(g))}/">${esc(g)} <small>${i.length}</small></a>`).join('')}</p></section>` : ''}
+      body: `<h1 class="visually-hidden">${esc(config.orgName)}（${esc(config.orgNameJa)}）— ${esc(config.tagline)}</h1>
+${hero(ranked.slice(0, 5))}
+${weekdayTabs(all)}
+${row('新着の漫画', all.slice(0, 18), '/manga/')}
+${ranked.length ? `<section class="shelf"><div class="shelf-head"><h2>${esc(config.curator.name)}ランキング</h2><a href="/ranking/">すべて見る ›</a></div>${ranking(ranked.slice(0, 10))}</section>` : '<p class="muted">作品は準備中です。</p>'}
+${genres.slice(0, 4).map(([g, items]) => row(`${g}の漫画`, items.slice(0, 18), `/genre/${encodeURIComponent(tagSlug(g))}/`)).join('\n')}
+${genres.length ? `<section class="shelf"><div class="shelf-head"><h2>ジャンルから探す</h2><a href="/genre/">一覧 ›</a></div><p class="tags big">${genres.slice(0, 30).map(([g, i]) => `<a class="tag" href="/genre/${encodeURIComponent(tagSlug(g))}/">${esc(g)} <small>${i.length}</small></a>`).join('')}</p></section>` : ''}
 ${jotaroBlock([...int.slice(0, 4), ...ext.slice(0, 4)])}
+<section class="about-strip"><p class="answer">${esc(config.description)}</p><p class="muted">掲載作品 ${all.length}作品 · ${genres.length}ジャンル · 毎日自動更新</p></section>
 <section class="faq"><h2>よくある質問</h2>${homeFaq.map((f) => `<details open><summary><h3>${esc(f.q)}</h3></summary><p>${esc(f.a)}</p></details>`).join('')}</section>`,
     }),
   );
   urls.unshift(['/', all[0]?.updatedAt]);
+
+  // ランキング
+  await out(
+    'ranking/index.html',
+    layout({
+      title: `漫画ランキング｜${config.curator.name}が選ぶおすすめ`,
+      description: `${config.orgName}のキュレーター${config.curator.name}が選んだ漫画ランキングTOP${Math.min(ranked.length, 50)}。あらすじ・ページ数・ジャンル付き。`,
+      path: '/ranking/',
+      crumbs: [['ホーム', `${S}/`], ['ランキング', `${S}/ranking/`]],
+      jsonld: [
+        { '@type': 'CollectionPage', '@id': `${S}/ranking/#webpage`, url: `${S}/ranking/`, name: '漫画ランキング', inLanguage: 'ja', isPartOf: { '@id': SITE_ID }, author: { '@id': `${S}/jotaro/#person` } },
+        { '@type': 'ItemList', '@id': `${S}/ranking/#list`, name: `${config.curator.name}の漫画ランキング`, itemListOrder: 'https://schema.org/ItemListOrderAscending', itemListElement: ranked.slice(0, 50).map((r, i) => ({ '@type': 'ListItem', position: i + 1, url: mangaUrl(r), name: r.title })) },
+      ],
+      body: `<h1>漫画ランキング</h1><p class="lead">${esc(config.curator.name)}がストーリー・作画・読みやすさで選んだ${esc(config.orgName)}の漫画ランキングです。</p>${ranked.length ? ranking(ranked.slice(0, 50)) : '<p class="muted">準備中です。</p>'}`,
+    }),
+  );
+  urls.push(['/ranking/', all[0]?.updatedAt]);
 
   // 組織ページ
   const statics = [
